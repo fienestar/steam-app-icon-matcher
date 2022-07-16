@@ -51,10 +51,18 @@ async function getAppId(appPath: string) {
     return +appId;
 }
 
+type AppInfo = {
+    common: {
+        name: string
+        clienticon: string,
+    }
+}
+
 async function getIconURI(appId: number) {
     const productInfo = await user.getProductInfo([appId], []);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-    const icon = productInfo.apps[appId].appinfo.common.clienticon;
+    const appInfo = productInfo.apps[appId].appinfo as AppInfo;
+    const icon = appInfo.common.clienticon;
+    console.log(`Getting icon for ${appInfo.common.name}...`);
     const iconURI = `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${appId}/${icon}.ico`;
     return iconURI;
 }
@@ -63,7 +71,6 @@ async function matchAppIcon(appPath: string) {
     const appId = await getAppId(appPath);
     const iconURI = await getIconURI(appId);
     const fileName = iconURI.split('/').pop() as string;
-    console.log(iconURI);
     const resourcePath = path.join(appPath, 'Resources');
     const file = fs.createWriteStream(path.join(resourcePath, fileName));
     await new Promise<void>((resolve) => https.get(iconURI, (response) => {
@@ -78,11 +85,7 @@ async function matchAppIcon(appPath: string) {
 
 
 async function app() {
-    if (process.argv.length < 3) {
-        return console.error(`usage: ${process.argv.join(' ')} [path of games]`);
-    }
-
-    const dirPath = process.argv[2];
+    const dirPath = await getInput('Enter the path to the app folder: ');
     const dir = await toPromise(fs.readdir.bind(fs, dirPath, {withFileTypes: true}));
     await Promise.all(dir.map(async (element) => {
         if (element.isDirectory()) {
@@ -94,7 +97,8 @@ async function app() {
 user.on('loggedOn', () => {
     app()
         .then(() => {
-            console.log('done!');
+            console.log('Done!');
+            process.exit(0);
         })
         .catch((error) => {
             console.error(error);
